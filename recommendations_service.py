@@ -20,7 +20,6 @@ from starlette.responses import Response as StarletteResponse
 from config import CFG
 from settings import ServiceSettings, get_settings
 
-
 logging.basicConfig(
     level=CFG.LOG_LEVEL,
     format="%(asctime)s | %(levelname)-7s | %(message)s",
@@ -54,6 +53,7 @@ class RecResponse(BaseModel):
     rank: int
     score: float
     source: str
+
 
 @dataclass
 class AppState:
@@ -104,20 +104,30 @@ def normalize(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def upd(cands: dict[int, dict[str, Any]], track_id: int, score: float, source: str) -> None:
     prev = cands.get(track_id)
     if prev is None or score > float(prev["score"]):
-        cands[track_id] = {"track_id": int(track_id), "score": float(score), "source": source}
+        cands[track_id] = {
+            "track_id": int(track_id),
+            "score": float(score),
+            "source": source,
+        }
 
 
 def attach_cached_accessors(state: AppState) -> None:
     topn = int(state.settings.service_cache_topn)
     similar_per_track = min(30, int(CFG.SIMILAR_TOP_N))
-    max_popular = max(int(CFG.TOP_K) * int(state.settings.popular_pool_multiplier), int(state.settings.popular_pool_min))
+    max_popular = max(
+        int(CFG.TOP_K) * int(state.settings.popular_pool_multiplier),
+        int(state.settings.popular_pool_min),
+    )
 
     @lru_cache(maxsize=50_000)
     def offline(source: str, user_id: int) -> list[dict[str, Any]]:
         dataset = state.ranked_ds if source == "ranked" else state.personal_ds
         if dataset is None:
             return []
-        table = dataset.to_table(filter=ds.field("user_id") == int(user_id), columns=["track_id", "rank", "score"])
+        table = dataset.to_table(
+            filter=ds.field("user_id") == int(user_id),
+            columns=["track_id", "rank", "score"],
+        )
         if table.num_rows == 0:
             return []
         ranks = table["rank"].to_numpy(zero_copy_only=False)
@@ -234,7 +244,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="music rec service", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
-app.add_exception_handler(RateLimitExceeded, lambda _r, _e: StarletteResponse("rate limit exceeded", status_code=429))
+app.add_exception_handler(
+    RateLimitExceeded,
+    lambda _r, _e: StarletteResponse("rate limit exceeded", status_code=429),
+)
 
 
 @app.middleware("http")
@@ -274,8 +287,18 @@ async def reload(request: Request, x_reload_token: str | None = Header(default=N
     if st.settings.reload_token and x_reload_token != st.settings.reload_token:
         raise HTTPException(403, "forbidden")
     load_all_datasets(st)
-    logger.info("reload ok: offline=%s similar=%s popular=%s", st.offline_ready, st.similar_ds is not None, st.popular_ds is not None)
-    return {"status": "reloaded", "offline": st.offline_ready, "similar": st.similar_ds is not None, "popular": st.popular_ds is not None}
+    logger.info(
+        "reload ok: offline=%s similar=%s popular=%s",
+        st.offline_ready,
+        st.similar_ds is not None,
+        st.popular_ds is not None,
+    )
+    return {
+        "status": "reloaded",
+        "offline": st.offline_ready,
+        "similar": st.similar_ds is not None,
+        "popular": st.popular_ds is not None,
+    }
 
 
 @app.post("/recommend", response_model=list[RecResponse])
@@ -316,11 +339,26 @@ async def recommend(request: Request, req: RecRequest = Body(...)):
     cands: dict[int, dict[str, Any]] = {}
 
     for r in ranked[:top_k]:
-        upd(cands, int(r["track_id"]), float(r["norm"]) * float(st.settings.weight_ranked), "ranked")
+        upd(
+            cands,
+            int(r["track_id"]),
+            float(r["norm"]) * float(st.settings.weight_ranked),
+            "ranked",
+        )
     for r in sim[: int(st.settings.online_take)]:
-        upd(cands, int(r["track_id"]), float(r["norm"]) * float(st.settings.weight_similar_online), "similar_online")
+        upd(
+            cands,
+            int(r["track_id"]),
+            float(r["norm"]) * float(st.settings.weight_similar_online),
+            "similar_online",
+        )
     for r in personal[:top_k]:
-        upd(cands, int(r["track_id"]), float(r["norm"]) * float(st.settings.weight_personal), "personal")
+        upd(
+            cands,
+            int(r["track_id"]),
+            float(r["norm"]) * float(st.settings.weight_personal),
+            "personal",
+        )
 
     if len(cands) < top_k and st.popular_ds is not None:
         for tid in st.get_popular_pool():
@@ -335,7 +373,15 @@ async def recommend(request: Request, req: RecRequest = Body(...)):
         return []
 
     out = sorted(cands.values(), key=lambda x: float(x["score"]), reverse=True)[:top_k]
-    res = [RecResponse(track_id=int(x["track_id"]), rank=i + 1, score=float(x["score"]), source=str(x["source"])) for i, x in enumerate(out)]
+    res = [
+        RecResponse(
+            track_id=int(x["track_id"]),
+            rank=i + 1,
+            score=float(x["score"]),
+            source=str(x["source"]),
+        )
+        for i, x in enumerate(out)
+    ]
     for r in res:
         RECS_SRC.labels(r.source).inc()
     return res

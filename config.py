@@ -90,7 +90,7 @@ class Config:
     ONLINE_KEEP: int = 200
     ONLINE_HISTORY_TAKE: int = 10
 
-    SIMILAR_PER_TRACK: int = 30 
+    SIMILAR_PER_TRACK: int = 30
     CACHE_TTL_SECONDS: int = 3600
 
     LOG_LEVEL: int = logging.INFO

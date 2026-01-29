@@ -5,9 +5,9 @@ DATA_DIR := "data"
 ARTIFACTS_DIR := "artifacts"
 NOTEBOOK_OUT_DIR := "artifacts/notebook_runs"
 
-APP_HOST := env_var_or_default("APP_HOST", "127.0.0.1")
-APP_PORT := env_var_or_default("APP_PORT", "8000")
-BASE_URL := "http://{{APP_HOST}}:{{APP_PORT}}"
+APP_HOST := env("APP_HOST", "127.0.0.1")
+APP_PORT := env("APP_PORT", "8000")
+BASE_URL := "http://" + APP_HOST + ":" + APP_PORT
 
 TRACKS_URL := "https://storage.yandexcloud.net/mle-data/ym/tracks.parquet"
 CATALOG_URL := "https://storage.yandexcloud.net/mle-data/ym/catalog_names.parquet"
@@ -31,8 +31,6 @@ data: dirs
   just download "{{CATALOG_URL}}" "catalog_names.parquet"
   just download "{{EVENTS_URL}}" "interactions.parquet"
 
-bootstrap: uv-sync data
-
 up:
   docker compose up --build -d
 
@@ -54,5 +52,19 @@ reload:
 test:
   pytest -q
 
+warm:
+  uv run python warm_history.py --users 20 --rounds 3 --seed-take 5
+
 default:
   just --list
+
+bootstrap: uv-sync dirs data
+
+all: bootstrap up health test
+  @echo "OK"
+
+smoke:
+  just up
+  just health
+  just test
+  just down

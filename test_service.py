@@ -10,7 +10,6 @@ import pytest
 
 import recommendations_service
 
-
 logger = logging.getLogger("service_tests")
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -20,7 +19,11 @@ logging.getLogger("recsys").setLevel(logging.WARNING)
 
 def make_recs(*, base_track_id: int, n: int, score_start: float) -> list[dict[str, Any]]:
     return [
-        {"track_id": int(base_track_id + i), "rank": i + 1, "score": float(score_start - i * 0.05)}
+        {
+            "track_id": int(base_track_id + i),
+            "rank": i + 1,
+            "score": float(score_start - i * 0.05),
+        }
         for i in range(int(n))
     ]
 
@@ -29,10 +32,14 @@ def log_recs(case: str, user_id: int, recs: list[dict[str, Any]]) -> None:
     sources = Counter(str(x.get("source")) for x in recs)
     top_k = min(int(recommendations_service.CFG.TOP_K), len(recs))
     head = [(int(x["track_id"]), str(x.get("source"))) for x in recs[:top_k] if "track_id" in x]
-    
+
     logger.info(
         "%s | user_id=%d | n=%d | sources=%s | head=%s",
-        case, user_id, len(recs), dict(sources), head,
+        case,
+        user_id,
+        len(recs),
+        dict(sources),
+        head,
     )
 
 
@@ -40,7 +47,9 @@ def has_source(recs: list[dict[str, Any]], source: str) -> bool:
     return any(str(x.get("source")) == source for x in recs)
 
 
-async def recommend(client: httpx.AsyncClient, user_id: int, online_tracks: list[int] | None = None) -> list[dict[str, Any]]:
+async def recommend(
+    client: httpx.AsyncClient, user_id: int, online_tracks: list[int] | None = None
+) -> list[dict[str, Any]]:
     payload: dict[str, Any] = {"user_id": int(user_id)}
     if online_tracks:
         payload["online_tracks"] = [int(x) for x in online_tracks]
@@ -67,7 +76,11 @@ def patch_service(monkeypatch: pytest.MonkeyPatch) -> None:
 
             if source == "ranked":
                 ranked_take = max(1, top_k - 3)
-                return make_recs(base_track_id=200_000 + user_id_int * 1_000, n=ranked_take, score_start=0.9)
+                return make_recs(
+                    base_track_id=200_000 + user_id_int * 1_000,
+                    n=ranked_take,
+                    score_start=0.9,
+                )
 
             if source == "personal":
                 if user_id_int == 1:
@@ -86,7 +99,12 @@ def patch_service(monkeypatch: pytest.MonkeyPatch) -> None:
         state.get_similar = similar
         state.get_popular_pool = popular_pool
 
-    monkeypatch.setattr(recommendations_service, "load_all_datasets", fake_load_all_datasets, raising=True)
+    monkeypatch.setattr(
+        recommendations_service,
+        "load_all_datasets",
+        fake_load_all_datasets,
+        raising=True,
+    )
 
 
 @pytest.fixture()

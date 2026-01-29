@@ -13,7 +13,13 @@ import pyarrow.dataset as ds
 from config import CFG
 
 
-def http_json(method: str, base_url: str, path: str, payload: dict[str, Any] | None, timeout: float) -> Any:
+def http_json(
+    method: str,
+    base_url: str,
+    path: str,
+    payload: dict[str, Any] | None,
+    timeout: float,
+) -> Any:
     url = f"{base_url}{path}"
     data = None if payload is None else json.dumps(payload).encode("utf-8")
     headers = {} if payload is None else {"Content-Type": "application/json"}
@@ -74,7 +80,13 @@ def take_seeds(recs: Any, *, seed_take: int) -> list[int]:
 @click.option("--seed-take", default=5, show_default=True, type=int)
 @click.option("--sleep", "sleep_seconds", default=0.2, show_default=True, type=float)
 @click.option("--timeout", "timeout_seconds", default=5.0, show_default=True, type=float)
-def main(users_take: int, rounds: int, seed_take: int, sleep_seconds: float, timeout_seconds: float) -> None:
+def main(
+    users_take: int,
+    rounds: int,
+    seed_take: int,
+    sleep_seconds: float,
+    timeout_seconds: float,
+) -> None:
     host, port = os.getenv("APP_HOST", "0.0.0.0"), int(os.getenv("APP_PORT", "8000"))
     base_url = f"http://{host}:{port}"
     user_ids = pick_user_ids(take=users_take)
@@ -112,7 +124,11 @@ def main(users_take: int, rounds: int, seed_take: int, sleep_seconds: float, tim
 
     CFG.SERVICE_FILES["warmed_users"].write_text(
         json.dumps(
-            {"picked_user_ids": user_ids, "warmed_user_ids": warmed, "users_with_similar": with_similar},
+            {
+                "picked_user_ids": user_ids,
+                "warmed_user_ids": warmed,
+                "users_with_similar": with_similar,
+            },
             ensure_ascii=False,
             indent=2,
         ),

@@ -61,7 +61,7 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/dashboards.json:/var/lib/grafana/dashboards/recsys.json:ro
+      - ./monitoring/dashboard/recsys.json:/var/lib/grafana/dashboards/recsys.json:ro
     networks: [app_net]
     restart: unless-stopped
 

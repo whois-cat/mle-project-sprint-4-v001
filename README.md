@@ -1,4 +1,13 @@
-# Подготовка виртуальной машины
+# Music Recommendations Service
+
+A FastAPI microservice that returns top-K track recommendations for a given `user_id`, mixing offline recommendations (ranked/personal) with online user history.
+
+## Endpoints
+
+- `POST /recommend` — get recommendations for a user
+- `GET /health` — service health (datasets/redis readiness)
+- `GET /metrics` — Prometheus metrics
+- `POST /reload` — reload parquet datasets
 
 ## Склонируйте репозиторий
 

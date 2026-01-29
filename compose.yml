@@ -1,41 +1,75 @@
-version: '3.8'
-
 services:
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
+    networks: [app_net]
+    restart: unless-stopped
 
   recommendations:
     build: .
+    env_file:
+      - .env
     ports:
-      - "8000:8000"
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_DB=0
-      - CACHE_TTL_SECONDS=3600
+      - "${APP_PORT:-8000}:8000"
     depends_on:
       redis:
         condition: service_healthy
     volumes:
-      # Mount artifacts directory for data files
-      - ./artifacts:/home/app/artifacts:ro
+      - ./artifacts:/app/artifacts:ro
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      start_period: 40s
-      retries: 3
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()"]
+      interval: 20s
+      timeout: 5s
+      start_period: 15s
+      retries: 5
+    networks: [app_net]
     restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.50.1
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    depends_on:
+      recommendations:
+        condition: service_healthy
+    volumes:
+      - ./monitoring/${PROMETHEUS_CONFIG:-prometheus.yaml}:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    networks: [app_net]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    depends_on:
+      prometheus:
+        condition: service_started
+    environment:
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-admin}"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/dashboards.json:/var/lib/grafana/dashboards/recsys.json:ro
+    networks: [app_net]
+    restart: unless-stopped
+
+networks:
+  app_net:
+    driver: bridge
 
 volumes:
   redis_data:
+  prometheus_data:
+  grafana_data:

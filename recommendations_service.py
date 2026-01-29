@@ -82,7 +82,7 @@ def ensure_columns(dataset: ds.Dataset, required: list[str]) -> None:
 
 
 def load_dataset(key: str) -> ds.Dataset | None:
-    path = CFG.ARTIFACTS_DIR / CFG.RECS_FILES[key]
+    path = CFG.RECS_FILES[key]
     return ds.dataset(str(path), format="parquet") if path.exists() else None
 
 
@@ -93,12 +93,12 @@ def stable_unique(values: list[int]) -> list[int]:
 def normalize(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if not records:
         return []
-    mn = min(float(r["score"]) for r in records)
-    mx = max(float(r["score"]) for r in records)
-    if mx <= mn:
+    min_score = min(float(r["score"]) for r in records)
+    max_score = max(float(r["score"]) for r in records)
+    if max_score <= min_score:
         return [{**r, "norm": 1.0} for r in records]
-    d = mx - mn
-    return [{**r, "norm": (float(r["score"]) - mn) / d} for r in records]
+    score_range = max_score - min_score
+    return [{**record, "norm": (float(record["score"]) - min_score) / score_range} for record in records]
 
 
 def upd(cands: dict[int, dict[str, Any]], track_id: int, score: float, source: str) -> None:
@@ -263,7 +263,9 @@ async def health(request: Request):
     }
 
 
-app.add_api_route(settings.metrics_path, lambda _r: StarletteResponse(generate_latest(), media_type=CONTENT_TYPE_LATEST), methods=["GET"])
+@app.get(settings.metrics_path)
+def metrics() -> StarletteResponse:
+    return StarletteResponse(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.post("/reload")

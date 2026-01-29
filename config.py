@@ -19,21 +19,29 @@ class Config:
     }
 
     CLEAN_FILES = {
-        "items": "items.parquet",
-        "events": "events.parquet",
-        "catalog_names": "catalog_names.parquet",
+        "items": DATA_DIR / "items.parquet",
+        "events": DATA_DIR / "events.parquet",
+        "catalog_names": DATA_DIR / "catalog_names.parquet",
     }
 
     RECS_FILES = {
-        "top_popular": "top_popular.parquet",
-        "personal_als": "personal_als.parquet",
-        "personal_als_features": "personal_als_features.parquet",
-        "similar": "similar.parquet",
-        "ranked": "recommendations.parquet",
+        "top_popular": ARTIFACTS_DIR / "top_popular.parquet",
+        "personal_als": ARTIFACTS_DIR / "personal_als.parquet",
+        "personal_als_features": ARTIFACTS_DIR / "personal_als_features.parquet",
+        "similar": ARTIFACTS_DIR / "similar.parquet",
+        "ranked": ARTIFACTS_DIR / "recommendations.parquet",
+    }
+
+    SERVICE_FILES = {
+        "warmed_users": ARTIFACTS_DIR / "warmed_users.json",
+        "model_metrics": ARTIFACTS_DIR / "model_metrics.json",
     }
 
     S3_DATA_PREFIX: str = "recsys/data"
     S3_RECS_PREFIX: str = "recsys/recommendations"
+
+    EDA_PERCENTILES: tuple = (0.5, 0.9, 0.99)
+    EDA_BINS: int = 80
 
     SEED: int = 42
 
@@ -57,10 +65,15 @@ class Config:
     ALS_REGULARIZATION: float = 0.01
     ALS_ALPHA: float = 40.0
     ALS_BATCH_USERS: int = 20_000
+    ALS_SUBBATCH_USERS: int = 2000
 
-    SIMILAR_TOP_N: int = 20_000
+    SIMILAR_TOP_N: int = 10_000
     SIMILAR_BATCH: int = 128
 
+    RANKER_VAL_DAYS: int = 14
+    RANKER_USERS: int = 50_000
+
+    BATCH_ROWS: int = 200_000
     TRAIN_USERS: int = 80_000
     TRAIN_ROWS_LIMIT: int = 1_200_000
 
@@ -72,6 +85,13 @@ class Config:
         "verbosity": -1,
         "seed": SEED,
     }
+
+    ONLINE_TAKE: int = 3
+    ONLINE_KEEP: int = 200
+    ONLINE_HISTORY_TAKE: int = 10
+
+    SIMILAR_PER_TRACK: int = 30 
+    CACHE_TTL_SECONDS: int = 3600
 
     LOG_LEVEL: int = logging.INFO
 

@@ -1,20 +1,20 @@
-set dotenv-load := true
-
+set dotenv-load
+set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
 DATA_DIR := "data"
 ARTIFACTS_DIR := "artifacts"
 NOTEBOOK_OUT_DIR := "artifacts/notebook_runs"
+
+APP_HOST := env_var_or_default("APP_HOST", "127.0.0.1")
+APP_PORT := env_var_or_default("APP_PORT", "8000")
+BASE_URL := "http://{{APP_HOST}}:{{APP_PORT}}"
 
 TRACKS_URL := "https://storage.yandexcloud.net/mle-data/ym/tracks.parquet"
 CATALOG_URL := "https://storage.yandexcloud.net/mle-data/ym/catalog_names.parquet"
 EVENTS_URL := "https://storage.yandexcloud.net/mle-data/ym/interactions.parquet"
 
 dirs:
-  mkdir -p "{{DATA_DIR}}"
-  mkdir -p "{{ARTIFACTS_DIR}}"
-  mkdir -p "{{NOTEBOOK_OUT_DIR}}"
-
-bootstrap: uv-sync data dirs
+  mkdir -p "{{DATA_DIR}}" "{{ARTIFACTS_DIR}}" "{{NOTEBOOK_OUT_DIR}}"
 
 uv-sync:
   uv sync
@@ -31,44 +31,28 @@ data: dirs
   just download "{{CATALOG_URL}}" "catalog_names.parquet"
   just download "{{EVENTS_URL}}" "interactions.parquet"
 
+bootstrap: uv-sync data
+
 up:
-  echo "starting containers in the background..."
   docker compose up --build -d
 
-test:
-  pytest -v
-
-reload:
-  curl -f -X POST "http://localhost:8000/reload" -H "X-Reload-Token: {{env_var('RELOAD_TOKEN')}}"
-
 down:
-  echo "stopping and removing containers..."
   docker compose down --remove-orphans
 
 logs:
-  echo "viewing logs..."
   docker compose logs -f
 
 shell service:
-  echo "opening a shell in the {{service}} container..."
   docker compose exec -it {{service}} bash
+
+health:
+  curl -fsS "{{BASE_URL}}/health" | python -m json.tool
+
+reload:
+  curl -f -X POST "{{BASE_URL}}/reload" -H "X-Reload-Token: {{env_var('RELOAD_TOKEN')}}"
+
+test:
+  pytest -q
 
 default:
   just --list
-    
-s3-env-check:
-    test -n "${S3_ENDPOINT_URL:-}"
-    test -n "${S3_BUCKET_NAME:-}"
-    test -n "${AWS_ACCESS_KEY_ID:-}"
-    test -n "${AWS_SECRET_ACCESS_KEY:-}"
-    @echo "S3 env looks set"
-
-notebook-run NOTEBOOK="recommendations.ipynb":
-    mkdir -p "{{NOTEBOOK_OUT_DIR}}"
-    uv run jupyter nbconvert --to notebook --execute \
-      --ExecutePreprocessor.timeout=-1 \
-      --output-dir "{{NOTEBOOK_OUT_DIR}}" \
-      --output "$(basename "{{NOTEBOOK}}" .ipynb).executed.ipynb" \
-      "{{NOTEBOOK}}"
-
-do-it: dirs up
